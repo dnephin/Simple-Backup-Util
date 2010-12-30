@@ -1,7 +1,8 @@
 """
- Backup Files and copy them to another location 
+ Backup Util
 
- Daniel Nephin
+ Only backup the files you want, frequently and automatically.
+
 """
 
 import tarfile
@@ -31,16 +32,6 @@ config = {
 		('/home/pontiffx/pers',),
 		('/root/', '\..*'),
 	],
-
-	# list of destinations for the backup file
-	# Tuple format: (name, path, type, filter_name)
-	'destinations': [
-#		('desktop', 'ssh://daniel@192.168.0.190', 'scp', None),
-	],
-
-	# list of function pointers to filter the backup package
-	'filters': [
-	]
 }
 
 
@@ -173,14 +164,13 @@ def filename(path, name, num=0):
 	return os.path.normpath("%s/%s.%d.tar.bz2" % (path, name, num))
 
 
-"""
- Send tarball to all destinations.
-"""
-
-
-
 
 if __name__ == "__main__":
+
+	rotate(config['local_path'], config['backup_name'], 
+			config['num_backup_packages'])
+
 	p = Packager()
 	p.package(config['include'], 
 		filename(config['local_path'], config['backup_name']))
+

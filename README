@@ -10,5 +10,7 @@ Features:
  - configure which files you want to include with an include/exclude list
  - configure how many copies you want to keep (older copies are removed)
  - archive is compressed using bzip2
- - optionally encrypt archive for storage on an un-trusted web host
+ - copy the archive to different drives, other servers and optionally 
+   encrypt archive for storage on an un-trusted web host by
+   modifying the included bash scripts
 
