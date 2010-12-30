@@ -82,8 +82,13 @@ class Packager(object):
 			if not os.path.isdir(path):
 				log.warn("Skipping: %s (Not a file or directory)" % (path))
 				continue
+			
+			try:
+				file_list = os.listdir(path)
+			except OSError, e:
+				log.warn("Error reading dir (%s): %s" % (path, e))
 
-			for filename in os.listdir(path):
+			for filename in file_list: 
 				if pattern.match(filename):
 					if filename in excluded:
 						continue
@@ -166,11 +171,23 @@ def filename(path, name, num=0):
 
 
 if __name__ == "__main__":
+	from optparse import OptionParser
 
-	rotate(config['local_path'], config['backup_name'], 
-			config['num_backup_packages'])
+	parser = OptionParser(usage="Usage: %prog [options]")
+	parser.add_option("-r", "--rotateonly", 
+			action="store_true", dest="rotateonly",
+			help="Only rotate the files.")
+	parser.add_option("-b", "--backuponly", 
+			action="store_true", dest="backuponly",
+			help="Only backup the files, do not rotate.")
+	(options, args) = parser.parse_args()
 
-	p = Packager()
-	p.package(config['include'], 
-		filename(config['local_path'], config['backup_name']))
+	if not options.backuponly:
+		rotate(config['local_path'], config['backup_name'], 
+				config['num_backup_packages'])
+
+	if not options.rotateonly:
+		p = Packager()
+		p.package(config['include'], 
+				filename(config['local_path'], config['backup_name']))
 
