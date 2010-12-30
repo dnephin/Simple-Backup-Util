@@ -1,31 +1,25 @@
 """
- Backup Filesystem
+ Backup Files and copy them to another location 
 
  Daniel Nephin
-
- Configuration:
- 	- package name
- 	- compression level
-	- number of backup packages to keep (rotates packages and removes oldest)
- 	- a list of directories to include (can match a pattern)
-	- a list of destinations to copy to
-		 - filters to process to package for each destination (encryption)
-
 """
 
 import tarfile
 import sys
-import os.path
+import os
 import re
 import logging
 
 log = logging
 
+# TODO: pass exclude list to Tarfile for finer grain exclude 
+# TODO: move config to another file (JSON, XML, property, python)?
+
 config = {
 	# name used in the backup file
 	'backup_name': 'dn-laptop',
 	# number of backup packages
-	'num_backup_packages': 3,
+	'num_backup_packages': 2,
 	# local backup location
 	'local_path': '/home/pontiffx/backup/',
 
@@ -35,7 +29,7 @@ config = {
 		('/home/pontiffx/', '\..*', set(('.cache', '.Trash'))),
 		('/etc',),
 		('/home/pontiffx/pers',),
-#		('/root/', '\..*'),
+		('/root/', '\..*'),
 	],
 
 	# list of destinations for the backup file
@@ -49,7 +43,7 @@ config = {
 	]
 }
 
-# TODO: pass exclude list to Tarfile for finer grain exclude
+
 
 class Packager(object):
 	"""
@@ -73,13 +67,11 @@ class Packager(object):
 		"""
 		expanded = []
 		for include_tuple in include:
-			# TODO: handle DIR does not exist or is not a dir
-			# TODO: handle invalid pattern
 
 			if len(include_tuple) < 1:
 				log.warn("Skipping empty tuple in include.")
 				continue
-			directory = include_tuple[0]
+			path = include_tuple[0]
 
 			if len(include_tuple) >= 2:
 				pattern = re.compile(include_tuple[1])
@@ -91,40 +83,104 @@ class Packager(object):
 			else:
 				excluded = set()
 
-			for filename in os.listdir(directory):
+			# just a file
+			if os.path.isfile(path):
+				expanded.append(path)
+				continue
+
+			if not os.path.isdir(path):
+				log.warn("Skipping: %s (Not a file or directory)" % (path))
+				continue
+
+			for filename in os.listdir(path):
 				if pattern.match(filename):
 					if filename in excluded:
 						continue
 					expanded.append(
-							os.path.normpath("%s/%s" % (directory, filename)))
+							os.path.normpath("%s/%s" % (path, filename)))
 		return expanded
+
+
+	# TODO: this requires 2.7
+	class FilterCallable(object):
+		
+		def __init__(self, includes):
+			self.includes = includes
+
+		def __call__(self, filename):
+			pass
 
 	def build_tarfile(self, file_list, name):
 		"""
 		 Build a compressed tarball that includes all the paths in include
 		"""
-		# TODO: check path is valid
-		# TODO: catch ReadError CompressionError
-		tf = tarfile.open(name, mode='w:bz2')
+		try:
+			tf = tarfile.open(name, mode='w:bz2')
+		except (IOError, tarfile.TarError), e:
+			log.warn("Failed to create archive: %s" % e)
+			return False
+
 		for file_path in file_list:
 			try:
-				tf.add(file_path)
+				arcname = self.make_relative(file_path)
+				tf.add(file_path, arcname)
 			except (OSError, IOError), e:
 				log.warn("Failed to add (%s): %s" % (file_path, e))
 
 		tf.close()
+		return True
+
+	@staticmethod
+	def make_relative(file_path, pathmodule=os.path):
+		"""
+		Make an absolute path relative to the root of the filesystem.  This is
+		done so that when the backed up files are extracted they do not 
+		overwrite the new files.
+
+		*Should* be portable to all OS supported by python.
+		"""
+		if not pathmodule.isabs(file_path):
+			return file_path
+
+		drive, arcname = pathmodule.splitdrive(file_path)
+		return arcname[1:]
 	
+
+
+def rotate(path, name, copies):
+	"""
+	Rotate files, and move older files.
+	"""
+	if copies <= 1:
+		return
+
+	for num in range(copies-2, -1, -1):
+		cur = filename(path, name, num)
+		new = filename(path, name, num+1)
+
+		if not os.path.isfile(cur):
+			continue
+
+		try:
+			os.rename(cur, new)
+		except OSError, e:
+			log.warn("Failed to rotate %s to %s: %s" % (cur, new, e))
+			return False
+	return True
+		
+
+def filename(path, name, num=0):
+	return os.path.normpath("%s/%s.%d.tar.bz2" % (path, name, num))
+
 
 """
  Send tarball to all destinations.
 """
 
 
-"""
- Rotate files, and move older files.
-"""
 
 
 if __name__ == "__main__":
 	p = Packager()
-	p.package(config['include'], '/tmp/test.tar.bz')
+	p.package(config['include'], 
+		filename(config['local_path'], config['backup_name']))

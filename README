@@ -1,0 +1,14 @@
+
+Simple Backup Util
+
+This backup utility is designed to be support regular automated backups of
+just your important data.  Backup files should be of minimal size, and 
+will be rotated. 
+
+Features:
+
+ - configure which files you want to include with an include/exclude list
+ - configure how many copies you want to keep (older copies are removed)
+ - archive is compressed using bzip2
+ - optionally encrypt archive for storage on an un-trusted web host
+
